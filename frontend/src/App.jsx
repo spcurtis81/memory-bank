@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import styled from 'styled-components';
+import { Toaster } from 'react-hot-toast';
 
 // Layout components
 import Sidebar from './components/Sidebar';
@@ -13,6 +14,7 @@ import FolderPage from './pages/FolderPage';
 const App = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [searchQuery, setSearchQuery] = useState('');
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -22,19 +24,48 @@ const App = () => {
     setViewMode(viewMode === 'grid' ? 'list' : 'grid');
   };
 
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+  };
+
   return (
     <AppContainer>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: 'var(--color-card)',
+            color: 'var(--color-text)',
+            border: '1px solid var(--color-border)',
+          },
+          success: {
+            iconTheme: {
+              primary: 'var(--color-success, #4caf50)',
+              secondary: 'white',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: 'var(--color-danger, #e53935)',
+              secondary: 'white',
+            },
+          },
+        }}
+      />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <MainContent>
         <Header 
           toggleSidebar={toggleSidebar} 
           viewMode={viewMode} 
-          toggleViewMode={toggleViewMode} 
+          toggleViewMode={toggleViewMode}
+          searchQuery={searchQuery}
+          onSearch={handleSearch}
         />
         <ContentArea>
           <Routes>
-            <Route path="/" element={<HomePage viewMode={viewMode} />} />
-            <Route path="/folder/:folderId" element={<FolderPage viewMode={viewMode} />} />
+            <Route path="/" element={<HomePage viewMode={viewMode} searchQuery={searchQuery} />} />
+            <Route path="/folder/:folderId" element={<FolderPage viewMode={viewMode} searchQuery={searchQuery} />} />
           </Routes>
         </ContentArea>
       </MainContent>

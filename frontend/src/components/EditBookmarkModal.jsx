@@ -2,23 +2,20 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FaTimes, FaPlus } from 'react-icons/fa';
 import { useMutation, useQueryClient, useQuery } from 'react-query';
-import { addBookmark, fetchFolders, fetchUrlMetadata, addFolder } from '../services/api';
+import { updateBookmark, fetchFolders, addFolder } from '../services/api';
 import { toast } from 'react-hot-toast';
 
-const AddBookmarkModal = ({ onClose }) => {
-  const [url, setUrl] = useState('');
-  const [title, setTitle] = useState('');
-  const [folderId, setFolderId] = useState('');
-  const [tags, setTags] = useState('');
-  const [isFetching, setIsFetching] = useState(false);
+const EditBookmarkModal = ({ bookmark, onClose, onSuccess }) => {
+  const [title, setTitle] = useState(bookmark.title);
+  const [url, setUrl] = useState(bookmark.url);
+  const [folderId, setFolderId] = useState(bookmark.folder_id || '');
+  const [tags, setTags] = useState(bookmark.tags.map(tag => tag.name).join(', '));
+  const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [favicon, setFavicon] = useState('');
-  const [image, setImage] = useState('');
   
   const queryClient = useQueryClient();
   
-  // Fetch folders when the component mounts
   const { data: folders = [], isLoading: isFoldersLoading, refetch: refetchFolders } = useQuery(
     'folders', 
     fetchFolders,
@@ -28,17 +25,23 @@ const AddBookmarkModal = ({ onClose }) => {
     }
   );
   
-  // Log folders data for debugging
   useEffect(() => {
-    console.log('Available folders in AddBookmarkModal:', folders);
+    console.log('Available folders in EditBookmarkModal:', folders);
   }, [folders]);
   
-  const addBookmarkMutation = useMutation(addBookmark, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('bookmarks');
-      onClose();
+  const updateBookmarkMutation = useMutation(
+    (data) => updateBookmark(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('bookmarks');
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          onClose();
+        }
+      }
     }
-  });
+  );
 
   const addFolderMutation = useMutation(addFolder, {
     onSuccess: async (newFolder) => {
@@ -55,37 +58,31 @@ const AddBookmarkModal = ({ onClose }) => {
     }
   });
 
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    
-    window.addEventListener('keydown', handleEsc);
-    return () => {
-      window.removeEventListener('keydown', handleEsc);
-    };
-  }, [onClose]);
-
-  const handleSubmit = async (e) => {
+  const handleUpdate = async (e) => {
     e.preventDefault();
     
-    if (!url) return;
+    if (!url || !title) return;
     
-    const tagArray = tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
+    setIsUpdating(true);
     
-    addBookmarkMutation.mutate({
-      url,
-      title: title || url,
-      folder_id: folderId === '' ? null : folderId,
-      tags: tagArray,
-      favicon,
-      image
-    });
+    try {
+      const tagArray = tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+      
+      await updateBookmarkMutation.mutateAsync({
+        id: bookmark.id,
+        title,
+        url,
+        folder_id: folderId === '' ? null : folderId,
+        tags: tagArray
+      });
+    } catch (error) {
+      console.error('Error updating bookmark:', error);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleAddFolder = async () => {
@@ -106,63 +103,39 @@ const AddBookmarkModal = ({ onClose }) => {
     }
   };
 
-  const fetchUrlInfo = async () => {
-    if (!url) return;
-    
-    setIsFetching(true);
-    try {
-      const metadata = await fetchUrlMetadata(url);
-      setTitle(metadata.title || url);
-      setFavicon(metadata.favicon || '');
-      setImage(metadata.image || '');
-      setIsFetching(false);
-    } catch (error) {
-      console.error('Error fetching URL info:', error);
-      setIsFetching(false);
-    }
-  };
-
   return (
     <ModalOverlay onClick={onClose}>
       <ModalContent onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
-          <ModalTitle>Add Bookmark</ModalTitle>
+          <ModalTitle>Edit Bookmark</ModalTitle>
           <CloseButton onClick={onClose}>
             <FaTimes />
           </CloseButton>
         </ModalHeader>
         
         <ModalBody>
-          <Form onSubmit={handleSubmit}>
+          <Form onSubmit={handleUpdate}>
             <FormGroup>
               <Label htmlFor="url">URL*</Label>
-              <InputWrapper>
-                <Input
-                  id="url"
-                  type="url"
-                  placeholder="https://example.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  required
-                />
-                <FetchButton 
-                  type="button" 
-                  onClick={fetchUrlInfo}
-                  disabled={!url || isFetching}
-                >
-                  {isFetching ? 'Fetching...' : 'Fetch'}
-                </FetchButton>
-              </InputWrapper>
+              <Input
+                id="url"
+                type="url"
+                placeholder="https://example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+              />
             </FormGroup>
             
             <FormGroup>
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Title*</Label>
               <Input
                 id="title"
                 type="text"
                 placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                required
               />
             </FormGroup>
             
@@ -177,13 +150,13 @@ const AddBookmarkModal = ({ onClose }) => {
                       value={newFolderName}
                       onChange={(e) => setNewFolderName(e.target.value)}
                     />
-                    <FetchButton 
+                    <FolderButton 
                       type="button" 
                       onClick={handleAddFolder}
                       disabled={addFolderMutation.isLoading || !newFolderName.trim()}
                     >
                       {addFolderMutation.isLoading ? 'Adding...' : 'Add'}
-                    </FetchButton>
+                    </FolderButton>
                   </InputWrapper>
                   <LinkButton
                     type="button"
@@ -229,15 +202,15 @@ const AddBookmarkModal = ({ onClose }) => {
             </FormGroup>
             
             <ButtonGroup>
-              <CancelButton type="button" onClick={onClose}>
+              <CancelButton type="button" onClick={onClose} disabled={isUpdating}>
                 Cancel
               </CancelButton>
-              <SubmitButton 
+              <SaveButton 
                 type="submit" 
-                disabled={!url || addBookmarkMutation.isLoading}
+                disabled={isUpdating || !url || !title}
               >
-                {addBookmarkMutation.isLoading ? 'Saving...' : 'Save'}
-              </SubmitButton>
+                {isUpdating ? 'Updating...' : 'Update'}
+              </SaveButton>
             </ButtonGroup>
           </Form>
         </ModalBody>
@@ -344,30 +317,6 @@ const HelpText = styled.small`
   margin-top: var(--spacing-xs);
 `;
 
-const InputWrapper = styled.div`
-  display: flex;
-  gap: var(--spacing-sm);
-`;
-
-const FetchButton = styled.button`
-  background-color: var(--color-secondary);
-  color: white;
-  border: none;
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-weight: 500;
-  
-  &:hover:not(:disabled) {
-    background-color: var(--color-primary-dark);
-  }
-  
-  &:disabled {
-    background-color: var(--color-border);
-    color: var(--color-text-light);
-    cursor: not-allowed;
-  }
-`;
-
 const ButtonGroup = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -386,12 +335,17 @@ const CancelButton = styled(Button)`
   border: 1px solid var(--color-border);
   color: var(--color-text);
   
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-background);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
 
-const SubmitButton = styled(Button)`
+const SaveButton = styled(Button)`
   background-color: var(--color-primary);
   color: white;
   border: none;
@@ -412,6 +366,30 @@ const LoadingText = styled.p`
   margin: var(--spacing-sm) 0;
 `;
 
+const InputWrapper = styled.div`
+  display: flex;
+  gap: var(--spacing-sm);
+`;
+
+const FolderButton = styled.button`
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-weight: 500;
+  
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-dark);
+  }
+  
+  &:disabled {
+    background-color: var(--color-border);
+    color: var(--color-text-light);
+    cursor: not-allowed;
+  }
+`;
+
 const LinkButton = styled.button`
   background: none;
   border: none;
@@ -427,4 +405,4 @@ const LinkButton = styled.button`
   }
 `;
 
-export default AddBookmarkModal; 
+export default EditBookmarkModal;

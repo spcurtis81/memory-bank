@@ -1,12 +1,39 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from 'react-query';
 import styled from 'styled-components';
 import { fetchBookmarks } from '../services/api';
 import BookmarkGrid from '../components/BookmarkGrid';
 import BookmarkList from '../components/BookmarkList';
 
-const HomePage = ({ viewMode }) => {
+const HomePage = ({ viewMode, searchQuery }) => {
   const { data: bookmarks = [], isLoading, error } = useQuery('bookmarks', () => fetchBookmarks());
+
+  // Filter bookmarks based on search query
+  const filteredBookmarks = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return bookmarks;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return bookmarks.filter(bookmark => {
+      // Search in title
+      if (bookmark.title && bookmark.title.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Search in URL
+      if (bookmark.url && bookmark.url.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Search in tags
+      if (bookmark.tags && bookmark.tags.some(tag => tag.name.toLowerCase().includes(query))) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [bookmarks, searchQuery]);
 
   if (isLoading) {
     return <LoadingMessage>Loading bookmarks...</LoadingMessage>;
@@ -25,14 +52,29 @@ const HomePage = ({ viewMode }) => {
     );
   }
 
+  if (filteredBookmarks.length === 0 && searchQuery.trim()) {
+    return (
+      <Container>
+        <PageTitle>Search results for "{searchQuery}"</PageTitle>
+        <EmptyState>
+          <EmptyTitle>No results found</EmptyTitle>
+          <EmptyText>Try a different search term</EmptyText>
+        </EmptyState>
+      </Container>
+    );
+  }
+
   return (
     <Container>
-      <PageTitle>All Bookmarks</PageTitle>
+      <PageTitle>
+        {searchQuery.trim() ? `Search results for "${searchQuery}"` : "All Bookmarks"}
+        {searchQuery.trim() && <ResultCount>({filteredBookmarks.length} results)</ResultCount>}
+      </PageTitle>
       
       {viewMode === 'grid' ? (
-        <BookmarkGrid bookmarks={bookmarks} />
+        <BookmarkGrid bookmarks={filteredBookmarks} />
       ) : (
-        <BookmarkList bookmarks={bookmarks} />
+        <BookmarkList bookmarks={filteredBookmarks} />
       )}
     </Container>
   );
@@ -84,6 +126,13 @@ const EmptyText = styled.p`
   color: var(--color-text-light);
   text-align: center;
   margin-bottom: var(--spacing-md);
+`;
+
+const ResultCount = styled.span`
+  font-size: 1rem;
+  font-weight: normal;
+  color: var(--color-text-light);
+  margin-left: var(--spacing-sm);
 `;
 
 export default HomePage; 

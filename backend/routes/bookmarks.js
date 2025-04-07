@@ -135,16 +135,16 @@ router.post(
     }
     
     try {
-      const { url, title, folder_id, tags = [] } = req.body;
+      const { url, title, folder_id, tags = [], favicon = null, image = null } = req.body;
       
       // Start a transaction
       await runAsync('BEGIN TRANSACTION');
       
       // Insert the bookmark
       const result = await runAsync(
-        `INSERT INTO bookmarks (title, url, folder_id)
-         VALUES (?, ?, ?)`,
-        [title, url, folder_id]
+        `INSERT INTO bookmarks (title, url, folder_id, favicon, image)
+         VALUES (?, ?, ?, ?, ?)`,
+        [title, url, folder_id, favicon, image]
       );
       
       const bookmarkId = result.lastID;
@@ -479,6 +479,37 @@ router.post('/fetch-metadata', body('url').isURL(), async (req, res) => {
     const description = $('meta[name="description"]').attr('content') || 
                         $('meta[property="og:description"]').attr('content') || '';
     
+    // Extract main image - try Open Graph first, then Twitter, then other methods
+    let image = $('meta[property="og:image"]').attr('content') || 
+                $('meta[name="twitter:image"]').attr('content') || '';
+               
+    // If no og/twitter image, try to get the first large image from the page
+    if (!image) {
+      $('img').each((i, el) => {
+        const src = $(el).attr('src');
+        const width = parseInt($(el).attr('width') || '0', 10);
+        const height = parseInt($(el).attr('height') || '0', 10);
+        
+        // Check if image is reasonably large (>= 200px in both dimensions or no dimensions specified)
+        if (src && ((width >= 200 && height >= 200) || (!width && !height))) {
+          image = src;
+          return false; // break the loop if we found a suitable image
+        }
+      });
+    }
+    
+    // Make image URL absolute if it's relative
+    if (image && !image.startsWith('http')) {
+      const urlObj = new URL(url);
+      if (image.startsWith('/')) {
+        image = `${urlObj.protocol}//${urlObj.host}${image}`;
+      } else if (image.startsWith('//')) {
+        image = `${urlObj.protocol}${image}`;
+      } else {
+        image = `${urlObj.protocol}//${urlObj.host}/${image}`;
+      }
+    }
+    
     // Extract favicon
     let favicon = $('link[rel="icon"]').attr('href') || 
                  $('link[rel="shortcut icon"]').attr('href') || '';
@@ -488,6 +519,8 @@ router.post('/fetch-metadata', body('url').isURL(), async (req, res) => {
       const urlObj = new URL(url);
       if (favicon.startsWith('/')) {
         favicon = `${urlObj.protocol}//${urlObj.host}${favicon}`;
+      } else if (favicon.startsWith('//')) {
+        favicon = `${urlObj.protocol}${favicon}`;
       } else {
         favicon = `${urlObj.protocol}//${urlObj.host}/${favicon}`;
       }
@@ -497,6 +530,7 @@ router.post('/fetch-metadata', body('url').isURL(), async (req, res) => {
       title,
       description,
       favicon,
+      image,
       url
     });
   } catch (err) {

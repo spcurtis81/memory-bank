@@ -1,16 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaBars, FaSearch, FaTh, FaList, FaPlus } from 'react-icons/fa';
+import { FaBars, FaSearch, FaTh, FaList, FaPlus, FaTimes } from 'react-icons/fa';
 import AddBookmarkModal from './AddBookmarkModal';
 
-const Header = ({ toggleSidebar, viewMode, toggleViewMode }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+const Header = ({ toggleSidebar, viewMode, toggleViewMode, searchQuery, onSearch }) => {
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery || '');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const handleSearch = (e) => {
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery || '');
+  }, [searchQuery]);
+
+  const handleSearchChange = (e) => {
+    const newQuery = e.target.value;
+    setLocalSearchQuery(newQuery);
+    onSearch(newQuery);
+  };
+
+  const handleClearSearch = () => {
+    setLocalSearchQuery('');
+    onSearch('');
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    // Handle search logic
-    console.log('Searching for:', searchQuery);
+    // Prevent form submission, search is already triggered on change
   };
 
   return (
@@ -22,16 +36,24 @@ const Header = ({ toggleSidebar, viewMode, toggleViewMode }) => {
         <AppTitle>Memory Bank</AppTitle>
       </LeftSection>
 
-      <SearchForm onSubmit={handleSearch}>
+      <SearchForm onSubmit={handleSubmit}>
         <SearchIcon>
           <FaSearch />
         </SearchIcon>
         <SearchInput
           type="text"
           placeholder="Search bookmarks and tags..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={localSearchQuery}
+          onChange={handleSearchChange}
         />
+        {localSearchQuery && (
+          <ClearButton 
+            onClick={handleClearSearch}
+            aria-label="Clear search"
+          >
+            <FaTimes />
+          </ClearButton>
+        )}
       </SearchForm>
 
       <RightSection>
@@ -181,6 +203,22 @@ const AddButton = styled.button`
     }
     
     padding: var(--spacing-sm);
+  }
+`;
+
+const ClearButton = styled.button`
+  background: none;
+  border: none;
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0 var(--spacing-xs);
+  
+  &:hover {
+    color: var(--color-text);
   }
 `;
 

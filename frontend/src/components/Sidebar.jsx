@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { useQuery } from 'react-query';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient, useMutation } from 'react-query';
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaFolder, FaFolderOpen, FaChevronRight, FaChevronDown, FaPlus, FaTimes } from 'react-icons/fa';
-import { fetchFolders } from '../services/api';
+import { FaFolder, FaFolderOpen, FaChevronRight, FaChevronDown, FaPlus, FaTimes, FaTrash, FaPen } from 'react-icons/fa';
+import { fetchFolders, addFolder, deleteFolder } from '../services/api';
+import { toast } from 'react-hot-toast';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
@@ -11,8 +12,35 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedParentId, setSelectedParentId] = useState(null);
+  const [isAddingFolder, setIsAddingFolder] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
-  const { data: folders = [], isLoading } = useQuery('folders', fetchFolders);
+  const queryClient = useQueryClient();
+  const { data: folders = [], isLoading, refetch } = useQuery('folders', fetchFolders, {
+    onSuccess: (data) => {
+      console.log('Query success - folders data:', data);
+    },
+    onError: (error) => {
+      console.error('Query error fetching folders:', error);
+    }
+  });
+
+  const deleteFolderMutation = useMutation(deleteFolder, {
+    onSuccess: () => {
+      queryClient.invalidateQueries('folders');
+      queryClient.invalidateQueries('bookmarks');
+      toast.success('Folder deleted successfully');
+    },
+    onError: (error) => {
+      console.error('Error deleting folder:', error);
+      toast.error('Failed to delete folder');
+    }
+  });
+
+  // Log folders data when it changes
+  useEffect(() => {
+    console.log('Folders data updated:', folders);
+  }, [folders]);
 
   const toggleFolder = (folderId) => {
     setExpandedFolders({
@@ -21,16 +49,59 @@ const Sidebar = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleAddFolder = () => {
-    // This would be replaced with an actual API call
-    console.log('Adding new folder:', newFolderName, 'with parent:', selectedParentId);
-    setShowNewFolderInput(false);
-    setNewFolderName('');
+  const handleAddFolder = async () => {
+    if (!newFolderName.trim()) return;
+    
+    setIsAddingFolder(true);
+    try {
+      await addFolder({ 
+        name: newFolderName.trim(),
+        parent_id: selectedParentId 
+      });
+      
+      // Invalidate the folders query to refetch the data
+      queryClient.invalidateQueries('folders');
+      
+      // Also explicitly refetch
+      await refetch();
+      
+      // Reset the form
+      setShowNewFolderInput(false);
+      setNewFolderName('');
+      setSelectedParentId(null);
+      
+      toast.success('Folder created successfully');
+    } catch (error) {
+      console.error('Error adding folder:', error);
+      toast.error('Failed to create folder');
+    } finally {
+      setIsAddingFolder(false);
+    }
+  };
+
+  const handleDeleteFolder = async (folderId) => {
+    if (!window.confirm('Are you sure you want to delete this folder? The bookmarks will be moved to root.')) {
+      return;
+    }
+    
+    deleteFolderMutation.mutate(folderId);
+  };
+
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
   };
 
   // Recursive function to build the folder tree
   const renderFolders = (parentId = null) => {
-    const childFolders = folders.filter(folder => folder.parent_id === parentId);
+    // Convert parentId to number or null for proper comparison
+    const normalizedParentId = parentId === null ? null : Number(parentId);
+    
+    // Filter folders that have matching parent_id
+    const childFolders = folders.filter(folder => {
+      // Convert folder.parent_id to number or keep as null
+      const folderParentId = folder.parent_id === null ? null : Number(folder.parent_id);
+      return folderParentId === normalizedParentId;
+    });
     
     if (childFolders.length === 0) return null;
 
@@ -53,10 +124,20 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <FolderLink 
                   to={`/folder/${folder.id}`} 
                   isActive={isActive}
+                  onClick={(e) => editMode && e.preventDefault()}
                 >
                   {isExpanded ? <FaFolderOpen /> : <FaFolder />}
                   <span>{folder.name}</span>
                 </FolderLink>
+                
+                {editMode && (
+                  <DeleteButton 
+                    onClick={() => handleDeleteFolder(folder.id)}
+                    aria-label="Delete folder"
+                  >
+                    <FaTrash />
+                  </DeleteButton>
+                )}
               </FolderRow>
               
               {isExpanded && renderFolders(folder.id)}
@@ -71,9 +152,18 @@ const Sidebar = ({ isOpen, onClose }) => {
     <SidebarContainer isOpen={isOpen}>
       <SidebarHeader>
         <SidebarTitle>Folders</SidebarTitle>
-        <CloseButton onClick={onClose}>
-          <FaTimes />
-        </CloseButton>
+        <HeaderActions>
+          <EditButton 
+            onClick={toggleEditMode}
+            isActive={editMode}
+            title={editMode ? "Exit edit mode" : "Edit folders"}
+          >
+            <FaPen />
+          </EditButton>
+          <CloseButton onClick={onClose}>
+            <FaTimes />
+          </CloseButton>
+        </HeaderActions>
       </SidebarHeader>
 
       <SidebarContent>
@@ -98,8 +188,18 @@ const Sidebar = ({ isOpen, onClose }) => {
                   autoFocus
                 />
                 <NewFolderActions>
-                  <SaveButton onClick={handleAddFolder}>Save</SaveButton>
-                  <CancelButton onClick={() => setShowNewFolderInput(false)}>Cancel</CancelButton>
+                  <SaveButton 
+                    onClick={handleAddFolder} 
+                    disabled={isAddingFolder || !newFolderName.trim()}
+                  >
+                    {isAddingFolder ? 'Saving...' : 'Save'}
+                  </SaveButton>
+                  <CancelButton 
+                    onClick={() => setShowNewFolderInput(false)}
+                    disabled={isAddingFolder}
+                  >
+                    Cancel
+                  </CancelButton>
                 </NewFolderActions>
               </NewFolderForm>
             ) : (
@@ -299,6 +399,42 @@ const CancelButton = styled.button`
   color: var(--color-text);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-sm);
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+`;
+
+const EditButton = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.isActive ? 'var(--color-primary)' : 'var(--color-text-light)'};
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  
+  &:hover {
+    color: var(--color-primary);
+  }
+`;
+
+const DeleteButton = styled.button`
+  background: none;
+  border: none;
+  color: var(--color-danger, #e53935);
+  margin-left: auto;
+  font-size: 0.9rem;
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  opacity: 0.7;
+  
+  &:hover {
+    opacity: 1;
+  }
 `;
 
 export default Sidebar; 

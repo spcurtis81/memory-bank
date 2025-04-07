@@ -31,13 +31,27 @@ export const deleteBookmark = async (id) => {
 
 // Folders
 export const fetchFolders = async () => {
-  const response = await api.get('/folders');
-  return response.data;
+  try {
+    console.log('Fetching folders...');
+    const response = await api.get('/folders');
+    console.log('Folders fetched:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching folders:', error);
+    throw error;
+  }
 };
 
 export const addFolder = async (folderData) => {
-  const response = await api.post('/folders', folderData);
-  return response.data;
+  try {
+    console.log('Adding folder:', folderData);
+    const response = await api.post('/folders', folderData);
+    console.log('Folder added:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error adding folder:', error);
+    throw error;
+  }
 };
 
 export const updateFolder = async ({ id, ...folderData }) => {
@@ -46,8 +60,15 @@ export const updateFolder = async ({ id, ...folderData }) => {
 };
 
 export const deleteFolder = async (id) => {
-  const response = await api.delete(`/folders/${id}`);
-  return response.data;
+  try {
+    console.log('Deleting folder:', id);
+    const response = await api.delete(`/folders/${id}`);
+    console.log('Folder deleted:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    throw error;
+  }
 };
 
 // Tags

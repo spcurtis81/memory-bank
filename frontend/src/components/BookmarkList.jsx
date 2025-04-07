@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { FaGlobe, FaEllipsisH, FaTrash, FaEdit, FaFolder } from 'react-icons/fa';
 import { useQueryClient, useMutation } from 'react-query';
 import { deleteBookmark } from '../services/api';
+import { truncateUrl, formatDate } from '../utils/formatters';
+import EditBookmarkModal from './EditBookmarkModal';
+import MoveBookmarkModal from './MoveBookmarkModal';
+import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const BookmarkList = ({ bookmarks }) => {
   const queryClient = useQueryClient();
+  const [editingBookmark, setEditingBookmark] = useState(null);
+  const [movingBookmark, setMovingBookmark] = useState(null);
   
   const deleteMutation = useMutation(deleteBookmark, {
     onSuccess: () => {
@@ -19,18 +26,40 @@ const BookmarkList = ({ bookmarks }) => {
     }
   };
 
+  const handleEdit = (bookmark) => {
+    setEditingBookmark(bookmark);
+  };
+
+  const handleMove = (bookmark) => {
+    setMovingBookmark(bookmark);
+  };
+
+  const handleMoveComplete = () => {
+    setMovingBookmark(null);
+    toast.success('Bookmark moved successfully!');
+  };
+  
+  const handleEditComplete = () => {
+    setEditingBookmark(null);
+    toast.success('Bookmark updated successfully!');
+  };
+
   return (
     <ListContainer>
       {bookmarks.map(bookmark => (
         <ListItem key={bookmark.id}>
           <IconWrapper>
-            <FaGlobe />
+            {bookmark.favicon ? (
+              <Favicon src={bookmark.favicon} alt="site icon" />
+            ) : (
+              <FaGlobe />
+            )}
           </IconWrapper>
           
           <ContentWrapper>
             <TitleRow>
               <Title title={bookmark.title}>{bookmark.title}</Title>
-              <UrlText>{formatUrl(bookmark.url)}</UrlText>
+              <UrlText>{truncateUrl(bookmark.url)}</UrlText>
             </TitleRow>
             
             {bookmark.tags && bookmark.tags.length > 0 && (
@@ -52,11 +81,11 @@ const BookmarkList = ({ bookmarks }) => {
                 <FaEllipsisH />
               </DropdownButton>
               <DropdownContent>
-                <DropdownItem>
+                <DropdownItem onClick={() => handleEdit(bookmark)}>
                   <FaEdit />
                   <span>Edit</span>
                 </DropdownItem>
-                <DropdownItem>
+                <DropdownItem onClick={() => handleMove(bookmark)}>
                   <FaFolder />
                   <span>Move</span>
                 </DropdownItem>
@@ -69,6 +98,22 @@ const BookmarkList = ({ bookmarks }) => {
           </Actions>
         </ListItem>
       ))}
+      
+      {editingBookmark && (
+        <EditBookmarkModal 
+          bookmark={editingBookmark} 
+          onClose={() => setEditingBookmark(null)}
+          onSuccess={handleEditComplete}
+        />
+      )}
+      
+      {movingBookmark && (
+        <MoveBookmarkModal 
+          bookmark={movingBookmark} 
+          onClose={() => setMovingBookmark(null)}
+          onSuccess={handleMoveComplete}
+        />
+      )}
     </ListContainer>
   );
 };
@@ -114,6 +159,12 @@ const IconWrapper = styled.div`
   margin-right: var(--spacing-md);
   color: var(--color-primary);
   flex-shrink: 0;
+`;
+
+const Favicon = styled.img`
+  max-width: 20px;
+  max-height: 20px;
+  object-fit: contain;
 `;
 
 const ContentWrapper = styled.div`
