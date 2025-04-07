@@ -1,8 +1,7 @@
 import express from 'express';
 import { body, query, param, validationResult } from 'express-validator';
 import { runAsync, getAsync, allAsync } from '../models/db.js';
-import fetch from 'node-fetch';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 const router = express.Router();
 
