@@ -1,0 +1,84 @@
+:root {
+  --color-primary: #4a6fa5;
+  --color-primary-dark: #345285;
+  --color-secondary: #5e81ac;
+  --color-accent: #88c0d0;
+  --color-background: #f9fafb;
+  --color-card: #ffffff;
+  --color-text: #2e3440;
+  --color-text-light: #4c566a;
+  --color-border: #e5e7eb;
+  --color-danger: #bf616a;
+  --color-success: #a3be8c;
+  --color-warning: #ebcb8b;
+  
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Mobile first responsive design */
+@media (max-width: 640px) {
+  .container {
+    width: 100%;
+    padding: 0 var(--spacing-md);
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container {
+    max-width: 768px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1025px) {
+  .container {
+    max-width: 1024px;
+    margin: 0 auto;
+  }
+} 
